@@ -1,0 +1,984 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>인건비 계산기</title>
+  <style>
+    :root {
+      --bg: #f7f8fb;
+      --card: #ffffff;
+      --line: #d9dce3;
+      --text: #1f2937;
+      --sub: #6b7280;
+      --primary: #2563eb;
+      --danger: #b91c1c;
+      --warn: #b45309;
+      --ok: #047857;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: "Malgun Gothic", "Apple SD Gothic Neo", sans-serif;
+      background: var(--bg);
+      color: var(--text);
+    }
+    .container {
+      max-width: 1400px;
+      margin: 0 auto;
+      padding: 24px;
+    }
+    h1 { margin: 0 0 8px; font-size: 28px; }
+    .guide {
+      margin: 0 0 20px;
+      color: var(--sub);
+      font-size: 14px;
+    }
+    .layout {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 16px;
+      align-items: start;
+    }
+    .card {
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      padding: 16px;
+    }
+    .card h2 {
+      margin: 0 0 12px;
+      font-size: 18px;
+    }
+    .form-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+      margin-bottom: 12px;
+    }
+    label {
+      display: block;
+      font-size: 13px;
+      margin-bottom: 4px;
+      color: var(--sub);
+    }
+    .label-with-help {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .info-wrap {
+      position: relative;
+      display: inline-flex;
+      align-items: center;
+    }
+    .info-icon {
+      width: 16px;
+      height: 16px;
+      border-radius: 999px;
+      border: 1px solid #9ca3af;
+      color: #4b5563;
+      font-size: 11px;
+      font-weight: bold;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      background: #fff;
+      cursor: help;
+      user-select: none;
+      line-height: 1;
+    }
+    .info-pop {
+      position: absolute;
+      top: 22px;
+      left: 0;
+      z-index: 20;
+      width: 360px;
+      background: #111827;
+      color: #f9fafb;
+      border-radius: 8px;
+      padding: 10px 12px;
+      font-size: 12px;
+      line-height: 1.5;
+      white-space: pre-line;
+      box-shadow: 0 8px 20px rgba(0, 0, 0, 0.25);
+      opacity: 0;
+      pointer-events: none;
+      transform: translateY(-4px);
+      transition: opacity 0.15s ease, transform 0.15s ease;
+    }
+    .info-pop-title {
+      display: block;
+      font-weight: 700;
+      font-size: 13px;
+      margin-bottom: 8px;
+      padding-bottom: 6px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.25);
+    }
+    .info-pop-section {
+      font-weight: 700;
+      display: inline-block;
+      margin-top: 2px;
+    }
+    .info-wrap:hover .info-pop,
+    .info-wrap:focus-within .info-pop {
+      opacity: 1;
+      pointer-events: auto;
+      transform: translateY(0);
+    }
+    input, select, button {
+      width: 100%;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 8px 10px;
+      font-size: 14px;
+      background: #fff;
+    }
+    button {
+      cursor: pointer;
+      background: #f3f4f6;
+    }
+    button.primary {
+      background: var(--primary);
+      color: #fff;
+      border-color: var(--primary);
+    }
+    .row-actions {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 12px;
+    }
+    .person-list {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #fff;
+      overflow: hidden;
+    }
+    .person-table-wrap {
+      overflow: auto;
+      max-height: 460px;
+    }
+    .input-table {
+      margin: 0;
+      min-width: 880px;
+    }
+    .input-table th,
+    .input-table td {
+      white-space: nowrap;
+      vertical-align: middle;
+    }
+    .input-table thead th {
+      position: sticky;
+      top: 0;
+      background: #f9fafb;
+      z-index: 1;
+      text-align: center;
+    }
+    .input-table td:first-child,
+    .input-table th:first-child {
+      text-align: center;
+    }
+    .drag-handle {
+      cursor: grab;
+      color: #6b7280;
+      user-select: none;
+      font-weight: bold;
+    }
+    .draggable-row {
+      background: #fff;
+    }
+    .draggable-row.dragging {
+      opacity: 0.55;
+    }
+    .draggable-row.drag-over {
+      outline: 2px solid #93c5fd;
+      outline-offset: -2px;
+      background: #eff6ff;
+    }
+    .input-cell {
+      width: 100%;
+      min-width: 90px;
+      padding: 6px 8px;
+      font-size: 13px;
+    }
+    .delete-btn {
+      width: auto;
+      background: #fff1f2;
+      border-color: #fecdd3;
+      color: #9f1239;
+      padding: 4px 8px;
+      font-size: 12px;
+    }
+    .table-action-btn {
+      width: auto;
+      padding: 4px 8px;
+      font-size: 12px;
+      margin-right: 4px;
+    }
+    .table-action-btn:last-child { margin-right: 0; }
+    .messages {
+      margin-bottom: 0;
+      display: grid;
+      gap: 6px;
+    }
+    .result-layout {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 320px;
+      gap: 12px;
+      align-items: start;
+    }
+    .result-main {
+      min-width: 0;
+    }
+    .result-side {
+      position: sticky;
+      top: 12px;
+      align-self: start;
+    }
+    .msg {
+      border-radius: 8px;
+      padding: 8px 10px;
+      font-size: 13px;
+    }
+    .msg.error { background: #fef2f2; color: var(--danger); border: 1px solid #fecaca; }
+    .msg.warn { background: #fffbeb; color: var(--warn); border: 1px solid #fde68a; }
+    .msg.ok { background: #ecfdf5; color: var(--ok); border: 1px solid #a7f3d0; }
+    table {
+      border-collapse: collapse;
+      width: 100%;
+      font-size: 13px;
+      margin-bottom: 14px;
+    }
+    th, td {
+      border: 1px solid var(--line);
+      padding: 6px 7px;
+      text-align: right;
+    }
+    th:first-child, td:first-child { text-align: left; }
+    .sub-row {
+      background: #f9fafb;
+      font-weight: bold;
+    }
+    .footer-note {
+      font-size: 12px;
+      color: #374151;
+      background: #f9fafb;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 10px;
+      line-height: 1.5;
+    }
+    .result-main .empty + .footer-note {
+      margin-top: 20px;
+    }
+    .empty {
+      color: var(--sub);
+      font-size: 13px;
+      border: 1px dashed var(--line);
+      border-radius: 8px;
+      padding: 12px;
+      text-align: center;
+      background: #fcfcfd;
+    }
+    @media (max-width: 1080px) {
+      .person-table-wrap { max-height: 360px; }
+      .result-layout { grid-template-columns: 1fr; }
+      .result-side { position: static; }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>인건비 계산기</h1>
+    <p class="guide">과제별 기준이 다를 수 있으므로 반드시 공고문 및 작성지침을 확인하세요.</p>
+    <div class="layout">
+      <section class="card">
+        <h2>입력 영역</h2>
+        <div class="form-grid">
+          <div>
+            <label for="govFund">정부지원금(천 원)</label>
+            <input id="govFund" type="number" min="0" step="1" placeholder="예: 100000" />
+          </div>
+          <div>
+            <label for="companyType" class="label-with-help">
+              <span>기업 유형</span>
+              <span class="info-wrap">
+                <span class="info-icon" tabindex="0" aria-label="기업 유형별 산정 기준 정보">!</span>
+                <span class="info-pop">
+<span class="info-pop-title">기업 유형별 정부지원금 / 기업부담금 비율 기준</span>
+<span class="info-pop-section">대기업</span>
+정부지원금: 해당 기관 사업비의 50% 이내
+기업부담금: 해당 기관 사업비의 50% 이상
+
+<span class="info-pop-section">중견기업</span>
+정부지원금: 해당 기관 사업비의 70% 이내
+기업부담금: 해당 기관 사업비의 30% 이상
+
+<span class="info-pop-section">중소기업</span>
+정부지원금: 해당 기관 사업비의 75% 이내
+기업부담금: 해당 기관 사업비의 25% 이상
+
+<span class="info-pop-section">공기업</span>
+기본적으로 대기업 기준 준용
+추후 별도 정책이 확정될 경우 정책값으로 대체 가능
+                </span>
+              </span>
+            </label>
+            <select id="companyType">
+              <option value="large">대기업</option>
+              <option value="mid" selected>중견기업</option>
+              <option value="small">중소기업</option>
+              <option value="public">공기업</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="row-actions">
+          <button id="addExisting">기존 인력 추가</button>
+          <button id="addNew">신규 인력 추가</button>
+          <button id="calculateBtn" class="primary">출력</button>
+        </div>
+
+        <div id="peopleList" class="person-list"></div>
+      </section>
+
+      <section class="card">
+        <h2>결과 영역</h2>
+        <div class="result-layout">
+          <div id="resultArea" class="result-main empty">참여인력을 입력한 뒤 출력 버튼을 눌러주세요.</div>
+          <div class="result-side">
+            <div id="messages" class="messages"></div>
+          </div>
+        </div>
+      </section>
+    </div>
+  </div>
+
+  <script>
+    const POLICY = {
+      large: { label: "대기업", govRatio: 0.5, cashRatio: 0.15 },
+      mid: { label: "중견기업", govRatio: 0.7, cashRatio: 0.13 },
+      small: { label: "중소기업", govRatio: 0.75, cashRatio: 0.1 },
+      public: { label: "공기업", govRatio: 0.5, cashRatio: 0.15 }
+    };
+
+    const state = { people: [] };
+    let personId = 1;
+    let draggingPersonId = null;
+
+    const peopleListEl = document.getElementById("peopleList");
+    const messagesEl = document.getElementById("messages");
+    const resultAreaEl = document.getElementById("resultArea");
+
+    function floorKrwToThousand(value) {
+      return Math.floor(Number(value) || 0);
+    }
+    function formatMoney(v) {
+      return Number(v || 0).toLocaleString("ko-KR");
+    }
+    function formatRate(v) {
+      return Number(v || 0).toLocaleString("ko-KR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    }
+    function sum(rows, key) {
+      return rows.reduce((acc, row) => acc + (row[key] || 0), 0);
+    }
+
+    function createPerson(type) {
+      return {
+        id: personId++,
+        personType: type,
+        name: type === "new" ? "채용예정" : "",
+        title: type === "new" ? "예정" : "",
+        employmentType: "정규직",
+        annualSalary: "",
+        months: ""
+      };
+    }
+    function addPerson(type) {
+      state.people.push(createPerson(type));
+      renderPeople();
+    }
+    function deletePerson(id) {
+      state.people = state.people.filter((p) => p.id !== id);
+      renderPeople();
+    }
+    function duplicatePerson(id) {
+      const target = state.people.find((p) => p.id === id);
+      if (!target) return;
+      const duplicated = { ...target, id: personId++ };
+      const index = state.people.findIndex((p) => p.id === id);
+      state.people.splice(index + 1, 0, duplicated);
+      renderPeople();
+    }
+    function reorderPerson(dragId, targetId, placeAfter) {
+      const dragIndex = state.people.findIndex((p) => p.id === dragId);
+      const targetIndex = state.people.findIndex((p) => p.id === targetId);
+      if (dragIndex < 0 || targetIndex < 0 || dragIndex === targetIndex) return;
+
+      const [dragItem] = state.people.splice(dragIndex, 1);
+      const adjustedTarget = state.people.findIndex((p) => p.id === targetId);
+      const insertIndex = adjustedTarget + (placeAfter ? 1 : 0);
+      state.people.splice(insertIndex, 0, dragItem);
+      renderPeople();
+    }
+    function updatePerson(id, key, value) {
+      const target = state.people.find((p) => p.id === id);
+      if (target) target[key] = value;
+    }
+
+    function renderPeople() {
+      peopleListEl.innerHTML = "";
+      if (state.people.length === 0) {
+        const empty = document.createElement("div");
+        empty.className = "empty";
+        empty.textContent = "참여인력이 없습니다. 기존/신규 인력을 추가해 주세요.";
+        peopleListEl.appendChild(empty);
+        return;
+      }
+      const wrap = document.createElement("div");
+      wrap.className = "person-table-wrap";
+
+      const table = document.createElement("table");
+      table.className = "input-table";
+      table.innerHTML = `
+        <thead>
+          <tr>
+            <th>이동</th>
+            <th>번호</th>
+            <th>인력 구분</th>
+            <th>성명</th>
+            <th>직위</th>
+            <th>구분</th>
+            <th>총 연봉(천 원)</th>
+            <th>참여 개월 수</th>
+            <th>작업</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${state.people.map((p, idx) => `
+            <tr class="draggable-row" draggable="true" data-row-id="${p.id}">
+              <td class="drag-handle" title="드래그해서 순서 변경">⋮⋮</td>
+              <td>${idx + 1}</td>
+              <td>${p.personType === "existing" ? "기존 인력" : "신규 인력"}</td>
+              <td><input class="input-cell" type="text" data-id="${p.id}" data-key="name" value="${p.name}" /></td>
+              <td><input class="input-cell" type="text" data-id="${p.id}" data-key="title" value="${p.title}" /></td>
+              <td>
+                <select class="input-cell" data-id="${p.id}" data-key="employmentType">
+                  <option value="정규직" ${p.employmentType === "정규직" ? "selected" : ""}>정규직</option>
+                  <option value="계약직" ${p.employmentType === "계약직" ? "selected" : ""}>계약직</option>
+                </select>
+              </td>
+              <td><input class="input-cell" type="number" min="1" step="1" data-id="${p.id}" data-key="annualSalary" value="${p.annualSalary}" /></td>
+              <td><input class="input-cell" type="number" min="1" max="12" step="1" data-id="${p.id}" data-key="months" value="${p.months}" /></td>
+              <td>
+                <button class="table-action-btn" data-action="copy" data-id="${p.id}">복사</button>
+                <button class="delete-btn" data-id="${p.id}">삭제</button>
+              </td>
+            </tr>
+          `).join("")}
+        </tbody>
+      `;
+
+      wrap.appendChild(table);
+      peopleListEl.appendChild(wrap);
+
+      peopleListEl.querySelectorAll(".delete-btn").forEach((btn) => {
+        btn.addEventListener("click", () => deletePerson(Number(btn.dataset.id)));
+      });
+      peopleListEl.querySelectorAll("[data-action='copy']").forEach((btn) => {
+        btn.addEventListener("click", () => duplicatePerson(Number(btn.dataset.id)));
+      });
+      peopleListEl.querySelectorAll("input, select").forEach((el) => {
+        el.addEventListener("input", (e) => {
+          const node = e.target;
+          updatePerson(Number(node.dataset.id), node.dataset.key, node.value);
+        });
+      });
+
+      peopleListEl.querySelectorAll(".draggable-row").forEach((row) => {
+        row.addEventListener("dragstart", (e) => {
+          draggingPersonId = Number(row.dataset.rowId);
+          row.classList.add("dragging");
+          e.dataTransfer.effectAllowed = "move";
+          e.dataTransfer.setData("text/plain", String(draggingPersonId));
+        });
+        row.addEventListener("dragend", () => {
+          row.classList.remove("dragging");
+          draggingPersonId = null;
+          peopleListEl.querySelectorAll(".draggable-row").forEach((r) => r.classList.remove("drag-over"));
+        });
+        row.addEventListener("dragover", (e) => {
+          e.preventDefault();
+          if (!draggingPersonId) return;
+          row.classList.add("drag-over");
+          e.dataTransfer.dropEffect = "move";
+        });
+        row.addEventListener("dragleave", () => {
+          row.classList.remove("drag-over");
+        });
+        row.addEventListener("drop", (e) => {
+          e.preventDefault();
+          row.classList.remove("drag-over");
+          const targetId = Number(row.dataset.rowId);
+          const rect = row.getBoundingClientRect();
+          const placeAfter = e.clientY > rect.top + rect.height / 2;
+          if (draggingPersonId && targetId) {
+            reorderPerson(draggingPersonId, targetId, placeAfter);
+          }
+        });
+      });
+    }
+
+    function normalizePeople(people) {
+      return people.map((p) => {
+        const isNew = p.personType === "new";
+        return {
+          ...p,
+          name: ((p.name || "").trim() || (isNew ? "채용예정" : "")),
+          title: ((p.title || "").trim() || (isNew ? "예정" : "")),
+          annualSalary: floorKrwToThousand(p.annualSalary),
+          months: floorKrwToThousand(p.months)
+        };
+      });
+    }
+
+    function validateInputs(govFund, companyType, people) {
+      const errors = [];
+      if (!Number.isFinite(govFund) || govFund <= 0) errors.push("정부지원금 0원 입력 시 계산 불가합니다.");
+      if (!POLICY[companyType]) errors.push("기업 유형이 올바르지 않습니다.");
+      if (!people.length) errors.push("참여인력은 최소 1명 이상이어야 합니다.");
+
+      people.forEach((p, i) => {
+        const prefix = `${i + 1}번 인력`;
+        if (!p.name || !String(p.name).trim()) errors.push(`${prefix}: 성명은 필수입니다.`);
+        if (!p.title || !String(p.title).trim()) errors.push(`${prefix}: 직위는 필수입니다.`);
+        if (!["정규직", "계약직"].includes(p.employmentType)) errors.push(`${prefix}: 구분은 정규직/계약직만 가능합니다.`);
+        if (!Number.isFinite(p.annualSalary) || p.annualSalary <= 0) errors.push(`${prefix}: 연봉은 0보다 커야 합니다.`);
+        if (!Number.isFinite(p.months) || p.months < 1 || p.months > 12) errors.push(`${prefix}: 참여 개월 수는 1~12 범위여야 합니다.`);
+      });
+      return errors;
+    }
+
+    function allocatePositiveByWeight(rows, targetAmount, capacityAccessor, assignCallback) {
+      if (!rows.length) return targetAmount;
+      if (targetAmount <= 0) return targetAmount;
+      const allocData = rows.map((row) => ({
+        row,
+        cap: Math.max(0, floorKrwToThousand(capacityAccessor(row)))
+      }));
+      const totalCap = allocData.reduce((acc, d) => acc + d.cap, 0);
+      if (targetAmount > totalCap) return targetAmount;
+      if (allocData.some((d) => d.cap < 1)) return targetAmount;
+      if (targetAmount < allocData.length) return targetAmount;
+
+      // 모든 인력 배분 원칙: 각 인력 최소 1(천원) 우선 배분
+      allocData.forEach((d) => {
+        assignCallback(d.row, 1);
+        d.base = 1;
+      });
+      let remain = targetAmount - allocData.length;
+      if (remain <= 0) return 0;
+
+      const weightSum = allocData.reduce((acc, d) => acc + Math.max(0, d.cap - d.base), 0);
+      if (weightSum <= 0) return remain;
+
+      let assigned = 0;
+      allocData.forEach((d) => {
+        const room = d.cap - d.base;
+        if (room <= 0) {
+          d.add = 0;
+          d.frac = 0;
+          return;
+        }
+        const raw = (remain * room) / weightSum;
+        const add = Math.min(room, Math.floor(raw));
+        d.add = add;
+        d.frac = raw - add;
+        assigned += add;
+      });
+      allocData.forEach((d) => {
+        if (d.add > 0) {
+          assignCallback(d.row, d.add);
+          d.base += d.add;
+        }
+      });
+
+      remain -= assigned;
+      allocData.sort((a, b) => b.frac - a.frac);
+      for (let i = 0; i < allocData.length && remain > 0; i += 1) {
+        const room = allocData[i].cap - allocData[i].base;
+        if (room > 0) {
+          assignCallback(allocData[i].row, 1);
+          allocData[i].base += 1;
+          remain -= 1;
+        }
+      }
+      for (let i = 0; i < allocData.length && remain > 0; i += 1) {
+        const room = allocData[i].cap - allocData[i].base;
+        if (room > 0) {
+          const extra = Math.min(room, remain);
+          assignCallback(allocData[i].row, extra);
+          allocData[i].base += extra;
+          remain -= extra;
+        }
+      }
+      return remain;
+    }
+
+    function allocateExistingByExclusiveRule(existingRows, govAmount, inKindAmount) {
+      existingRows.forEach((r) => {
+        r.cash = 0;
+        r.inKind = 0;
+        r._sourceType = "";
+      });
+      if (!existingRows.length) return { success: false, cashBalanced: false, inKindBalanced: false };
+
+      if (govAmount === 0) {
+        const remain = allocatePositiveByWeight(existingRows, inKindAmount, (r) => r.reflectedSalary, (row, amount) => {
+          row.inKind += amount;
+          row._sourceType = "privateInKind";
+        });
+        return { success: remain === 0, cashBalanced: true, inKindBalanced: remain === 0 };
+      }
+      if (inKindAmount === 0) {
+        const remain = allocatePositiveByWeight(existingRows, govAmount, (r) => r.reflectedSalary, (row, amount) => {
+          row.cash += amount;
+          row._sourceType = "govCash";
+        });
+        return { success: remain === 0, cashBalanced: remain === 0, inKindBalanced: true };
+      }
+
+      const sorted = [...existingRows].sort((a, b) => b.reflectedSalary - a.reflectedSalary);
+      const totalCap = sum(sorted, "reflectedSalary");
+      const targetCashCap = (totalCap * govAmount) / (govAmount + inKindAmount);
+      const cashGroup = [];
+      const inKindGroup = [];
+      let cashCap = 0;
+
+      sorted.forEach((row) => {
+        if (cashCap < targetCashCap) {
+          cashGroup.push(row);
+          cashCap += row.reflectedSalary;
+        } else {
+          inKindGroup.push(row);
+        }
+      });
+      if (!cashGroup.length && inKindGroup.length) cashGroup.push(inKindGroup.shift());
+      if (!inKindGroup.length && cashGroup.length) inKindGroup.push(cashGroup.pop());
+
+      let safeGuard = 0;
+      while (safeGuard < sorted.length * 4) {
+        safeGuard += 1;
+        const cashCapNow = sum(cashGroup, "reflectedSalary");
+        const inKindCapNow = sum(inKindGroup, "reflectedSalary");
+        const invalidCash = govAmount > cashCapNow || govAmount < cashGroup.length;
+        const invalidInKind = inKindAmount > inKindCapNow || inKindAmount < inKindGroup.length;
+        if (!invalidCash && !invalidInKind) break;
+
+        if (invalidCash && inKindGroup.length > 1) {
+          const move = [...inKindGroup].sort((a, b) => b.reflectedSalary - a.reflectedSalary)[0];
+          inKindGroup.splice(inKindGroup.indexOf(move), 1);
+          cashGroup.push(move);
+          continue;
+        }
+        if (invalidInKind && cashGroup.length > 1) {
+          const move = [...cashGroup].sort((a, b) => b.reflectedSalary - a.reflectedSalary)[0];
+          cashGroup.splice(cashGroup.indexOf(move), 1);
+          inKindGroup.push(move);
+          continue;
+        }
+        break;
+      }
+
+      if (!cashGroup.length || !inKindGroup.length) return { success: false, cashBalanced: false, inKindBalanced: false };
+      if (govAmount > sum(cashGroup, "reflectedSalary") || inKindAmount > sum(inKindGroup, "reflectedSalary")) {
+        return { success: false, cashBalanced: false, inKindBalanced: false };
+      }
+      if (govAmount < cashGroup.length || inKindAmount < inKindGroup.length) {
+        return { success: false, cashBalanced: false, inKindBalanced: false };
+      }
+
+      const govRemain = allocatePositiveByWeight(cashGroup, govAmount, (r) => r.reflectedSalary, (row, amount) => {
+        row.cash += amount;
+        row._sourceType = "govCash";
+      });
+      const inKindRemain = allocatePositiveByWeight(inKindGroup, inKindAmount, (r) => r.reflectedSalary, (row, amount) => {
+        row.inKind += amount;
+        row._sourceType = "privateInKind";
+      });
+      return { success: govRemain === 0 && inKindRemain === 0, cashBalanced: govRemain === 0, inKindBalanced: inKindRemain === 0 };
+    }
+
+    function buildTable1(govFund, policy) {
+      const totalProjectCost = floorKrwToThousand(govFund / policy.govRatio);
+      const privateTotal = totalProjectCost - govFund;
+      const privateCash = floorKrwToThousand(privateTotal * policy.cashRatio);
+      const privateInKind = privateTotal - privateCash;
+      return {
+        govFund,
+        privateCash,
+        privateInKind,
+        privateTotal,
+        grand: govFund + privateTotal,
+        totalProjectCost
+      };
+    }
+
+    function buildCalculation(input) {
+      const { govFund, companyType, people } = input;
+      const policy = POLICY[companyType];
+      const table1 = buildTable1(govFund, policy);
+
+      const detailed = people.map((p) => ({
+        ...p,
+        reflectedSalary: floorKrwToThousand((p.annualSalary / 12) * p.months),
+        cash: 0,
+        inKind: 0,
+        total: 0,
+        participationRate: 0
+      }));
+
+      const existingRows = detailed.filter((p) => p.personType === "existing");
+      const newRows = detailed.filter((p) => p.personType === "new");
+      const existingReflectedTotal = sum(existingRows, "reflectedSalary");
+      const newReflectedTotal = sum(newRows, "reflectedSalary");
+
+      const errors = [];
+      const warnings = [];
+      const oks = [];
+      let table1Only = false;
+      let existingAlloc = { success: false, cashBalanced: false, inKindBalanced: false };
+      let privateCashRemain = table1.privateCash;
+
+      if (table1.govFund > existingReflectedTotal) {
+        errors.push("정부지원금 총액이 기존 인력 총계보다 큰 경우 계산할 수 없습니다.");
+        table1Only = true;
+      }
+      if (table1.privateCash > newReflectedTotal) errors.push("기업부담금(현금) 총액이 신규 인력 총계보다 큰 경우 계산할 수 없습니다.");
+      if (!errors.length) {
+        existingAlloc = allocateExistingByExclusiveRule(existingRows, table1.govFund, table1.privateInKind);
+        privateCashRemain = allocatePositiveByWeight(newRows, table1.privateCash, (r) => r.reflectedSalary, (row, amount) => {
+          row.cash += amount;
+        });
+
+        if (!existingAlloc.success) {
+          errors.push("기존 인력 1인 기준(현금/현물 단일 편성)을 만족하면서 정부지원금과 기업부담금(현물)을 전부 배분하지 못했습니다.");
+        }
+        if (privateCashRemain > 0) errors.push("기업부담금(현금)을 신규 인력 현금으로 전부 배분하지 못했습니다.");
+      }
+
+      detailed.forEach((row) => {
+        row.total = row.cash + row.inKind;
+        row.participationRate = row.reflectedSalary > 0 ? Math.floor((row.total / row.reflectedSalary) * 10000) / 100 : 0;
+      });
+
+      const existingCash = sum(existingRows, "cash");
+      const existingInKind = sum(existingRows, "inKind");
+      const newCash = sum(newRows, "cash");
+      const newInKind = sum(newRows, "inKind");
+      const grandTotal = sum(detailed, "total");
+
+      if (!table1Only) {
+        if (existingCash !== table1.govFund) errors.push("표1 정부지원금과 표2 기존 인력 소계(현금)가 일치하지 않습니다.");
+        if (newCash !== table1.privateCash) errors.push("표1 기업부담금(현금)과 표2 신규 인력 소계(현금)가 일치하지 않습니다.");
+        if (existingInKind !== table1.privateInKind) errors.push("표1 기업부담금(현물)과 표2 기존 인력 소계(현물)가 일치하지 않습니다.");
+        if (grandTotal !== table1.grand) errors.push("계산 결과 재원 합계와 인력별 계 합계가 일치하지 않습니다.");
+
+        if (newInKind > 0) errors.push("신규 인력에 현물이 배치되는 결과가 발생했습니다.");
+        if (existingRows.some((r) => r.inKind < 0 || r.cash < 0)) errors.push("기존 인력 배분 결과가 유효하지 않습니다.");
+        if (newRows.some((r) => r.inKind !== 0)) errors.push("신규 인력에 정부지원금 또는 현물이 배치되는 결과가 발생했습니다.");
+        if (existingRows.some((r) => r.cash > 0 && r.inKind > 0)) errors.push("기존 인력 1인에게 현금과 현물이 동시에 배치되는 결과가 발생했습니다.");
+      }
+
+      const overRateRows = detailed.filter((r) => r.participationRate > 100);
+      const zeroTotalRows = detailed.filter((r) => r.total <= 0);
+      if (!table1Only && zeroTotalRows.length > 0) {
+        errors.push("일부 입력 인력의 계가 0으로 계산되었습니다. 모든 입력 인력이 배분되도록 참여인력 구성 또는 금액을 조정해 주세요.");
+      }
+      if (!table1Only && overRateRows.length > 0) {
+        warnings.push("참여율이 100%를 초과하는 인력이 있습니다. 참여 인력 수가 부족할 수 있으므로 참여인력 수를 조정해 주세요.");
+        warnings.push("현재 입력된 인력 구성으로는 적정 참여율 산정이 어렵습니다. 참여 인력을 추가하거나 배분 금액을 조정해 주세요.");
+      }
+
+      if (!errors.length) {
+        oks.push("정부지원금 비율 기준 충족");
+        oks.push("기업부담금 기준 충족");
+        oks.push("기업부담금 내 현금부담 기준 충족");
+        oks.push("재원 배치 기준 충족");
+        oks.push("기존 인력 1인 단위 편성 기준 충족");
+        oks.push("모든 입력 인력이 배분됨");
+        if (existingAlloc.cashBalanced && existingAlloc.inKindBalanced) {
+          oks.push("기존인력 참여율 균형 기준 반영");
+        }
+        if (privateCashRemain === 0) {
+          oks.push("신규인력 참여율 균형 기준 반영");
+        }
+      }
+      return {
+        policy,
+        detailed,
+        table1,
+        totals: { existingCash, existingInKind, newCash, newInKind, grandTotal },
+        table1Only,
+        messages: { errors, warnings, oks }
+      };
+    }
+
+    function renderMessages({ errors, warnings, oks }) {
+      messagesEl.innerHTML = "";
+      [...errors.map((m) => ({ m, c: "error" })), ...warnings.map((m) => ({ m, c: "warn" })), ...oks.map((m) => ({ m, c: "ok" }))]
+        .forEach((item) => {
+          const div = document.createElement("div");
+          div.className = `msg ${item.c}`;
+          div.textContent = item.m;
+          messagesEl.appendChild(div);
+        });
+    }
+
+    function getGuideNoteHtml() {
+      return `
+        <div class="footer-note">
+          <strong>안내</strong><br />
+          본 계산기는 일반적인 정부지원금 및 기업부담금 기준을 바탕으로 산정한 참고용 도구입니다.<br />
+          본 기능은 다음 기준을 적용합니다:<br />
+          정부지원금은 기존 인력의 현금에만, 기업부담금 중 현금은 신규 인력에만, 기업부담금 중 현물은 기존 인력에만 배치합니다.<br />
+          기존 인력은 1인 기준으로 현금 또는 현물 중 하나의 방식으로만 편성합니다.<br />
+          참여율이 100%를 초과하는 경우에는 참여인력 수 조정이 필요할 수 있습니다.<br />
+          사업별로 인건비 편성 기준 등이 상이할 수 있으므로 반드시 해당 과제의 작성 지침을 별도로 확인해야 합니다.
+        </div>
+      `;
+    }
+
+    function renderResultPlaceholder(message) {
+      resultAreaEl.className = "result-main";
+      resultAreaEl.innerHTML = `<div class="empty">${message}</div>${getGuideNoteHtml()}`;
+    }
+
+    function getTable1Html(table1) {
+      return `
+        <h3>인건비 총괄</h3>
+        <table>
+          <thead>
+            <tr>
+              <th>비목</th><th>정부지원금</th><th>기업부담금(현금)</th><th>기업부담금(현물)</th><th>기업부담금 소계</th><th>합계</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>인건비</td>
+              <td>${formatMoney(table1.govFund)}</td>
+              <td>${formatMoney(table1.privateCash)}</td>
+              <td>${formatMoney(table1.privateInKind)}</td>
+              <td>${formatMoney(table1.privateTotal)}</td>
+              <td>${formatMoney(table1.grand)}</td>
+            </tr>
+          </tbody>
+        </table>
+      `;
+    }
+
+    function renderTable1Only(result) {
+      resultAreaEl.className = "result-main";
+      resultAreaEl.innerHTML = getTable1Html(result.table1) + getGuideNoteHtml();
+    }
+
+    function renderTables(result) {
+      const { detailed, table1 } = result;
+      if (!detailed.length) {
+        renderResultPlaceholder("참여인력 데이터가 없어 결과를 표시할 수 없습니다.");
+        return;
+      }
+
+      const existingRows = detailed.filter((r) => r.personType === "existing");
+      const newRows = detailed.filter((r) => r.personType === "new");
+
+      const rowHtml = (r) => `
+        <tr>
+          <td>${r.personType === "existing" ? "기존 인력" : "신규 인력"}</td>
+          <td>${r.name}</td>
+          <td>${r.title}</td>
+          <td>${r.employmentType}</td>
+          <td>${formatMoney(r.annualSalary)}</td>
+          <td>${formatMoney(r.months)}</td>
+          <td>${formatMoney(r.reflectedSalary)}</td>
+          <td>${formatRate(r.participationRate)}</td>
+          <td>${formatMoney(r.cash)}</td>
+          <td>${formatMoney(r.inKind)}</td>
+          <td>${formatMoney(r.total)}</td>
+        </tr>
+      `;
+
+      const table1Html = getTable1Html(table1);
+
+      const table2Html = `
+        <h3>인건비 세부</h3>
+        <table>
+          <thead>
+            <tr>
+              <th>인력 구분</th><th>성명</th><th>직위</th><th>구분</th><th>총 연봉</th><th>참여개월수</th><th>참여개월 반영 연봉</th><th>참여율(%)</th><th>현금</th><th>현물</th><th>계</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${existingRows.map(rowHtml).join("")}
+            <tr class="sub-row">
+              <td>기존 인력 소계</td><td colspan="7"></td>
+              <td>${formatMoney(sum(existingRows, "cash"))}</td>
+              <td>${formatMoney(sum(existingRows, "inKind"))}</td>
+              <td>${formatMoney(sum(existingRows, "total"))}</td>
+            </tr>
+            ${newRows.map(rowHtml).join("")}
+            <tr class="sub-row">
+              <td>신규 인력 소계</td><td colspan="7"></td>
+              <td>${formatMoney(sum(newRows, "cash"))}</td>
+              <td>${formatMoney(sum(newRows, "inKind"))}</td>
+              <td>${formatMoney(sum(newRows, "total"))}</td>
+            </tr>
+            <tr class="sub-row">
+              <td>합계</td><td colspan="7"></td>
+              <td>${formatMoney(sum(detailed, "cash"))}</td>
+              <td>${formatMoney(sum(detailed, "inKind"))}</td>
+              <td>${formatMoney(sum(detailed, "total"))}</td>
+            </tr>
+          </tbody>
+        </table>
+      `;
+
+      resultAreaEl.className = "result-main";
+      resultAreaEl.innerHTML = table1Html + table2Html + getGuideNoteHtml();
+    }
+
+    document.getElementById("addExisting").addEventListener("click", () => addPerson("existing"));
+    document.getElementById("addNew").addEventListener("click", () => addPerson("new"));
+
+    document.getElementById("calculateBtn").addEventListener("click", () => {
+      const govFund = floorKrwToThousand(document.getElementById("govFund").value);
+      const companyType = document.getElementById("companyType").value;
+      const normalized = normalizePeople(state.people);
+
+      const errors = validateInputs(govFund, companyType, normalized);
+      if (errors.length) {
+        renderMessages({ errors, warnings: [], oks: [] });
+        renderResultPlaceholder("입력값 오류를 먼저 수정해 주세요.");
+        return;
+      }
+
+      const result = buildCalculation({ govFund, companyType, people: normalized });
+      renderMessages(result.messages);
+
+      if (result.messages.errors.length) {
+        if (result.table1Only) {
+          renderTable1Only(result);
+          return;
+        }
+        renderResultPlaceholder("계산 조건을 충족하지 않아 결과 표를 생성할 수 없습니다.");
+        return;
+      }
+      renderTables(result);
+    });
+
+    addPerson("existing");
+    addPerson("new");
+    renderResultPlaceholder("참여인력을 입력한 뒤 출력 버튼을 눌러주세요.");
+  </script>
+</body>
+</html>
