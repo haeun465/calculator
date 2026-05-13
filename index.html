@@ -3,12 +3,12 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>인건비 계산기 ver1</title>
+  <title>인건비 계산기</title>
   <style>
     :root {
       --bg: #f7f8fb;
       --card: #ffffff;
-      --line: #d9dce3;
+     2dldkldld --line: #d9dce3;
       --text: #1f2937;
       --sub: #6b7280;
       --primary: #2563eb;
@@ -178,6 +178,9 @@
     .input-table th:first-child {
       text-align: center;
     }
+    .input-table td:last-child {
+      text-align: center;
+    }
     .drag-handle {
       cursor: grab;
       color: #6b7280;
@@ -271,6 +274,9 @@
     .result-main .empty + .footer-note {
       margin-top: 20px;
     }
+    .result-main .download-hwp-wrap + .footer-note {
+      margin-top: 18px;
+    }
     .empty {
       color: var(--sub);
       font-size: 13px;
@@ -279,6 +285,52 @@
       padding: 12px;
       text-align: center;
       background: #fcfcfd;
+    }
+    .result-card-title {
+      margin: 0 0 12px;
+      font-size: 18px;
+    }
+    .download-hwp-wrap {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 6px;
+      width: 100%;
+      max-width: 100%;
+      min-width: 0;
+    }
+    .result-download-below {
+      margin-top: 14px;
+      max-width: 100%;
+    }
+    .download-hwp-btn {
+      box-sizing: border-box;
+      width: auto;
+      max-width: 100%;
+      padding: 8px 10px;
+      font-size: 14px;
+      line-height: 1.4;
+      background: #fff;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .download-hwp-btn:disabled {
+      opacity: 0.45;
+      cursor: not-allowed;
+    }
+    .download-hwp-hint {
+      margin: 0;
+      font-size: 11px;
+      color: var(--sub);
+      line-height: 1.4;
+      white-space: nowrap;
+      overflow-x: auto;
+      overflow-y: hidden;
+      max-width: 100%;
+      min-width: 0;
     }
     @media (max-width: 1080px) {
       .person-table-wrap { max-height: 360px; }
@@ -308,15 +360,15 @@
 <span class="info-pop-title">기업 유형별 정부지원금 / 기업부담금 비율 기준</span>
 <span class="info-pop-section">대기업</span>
 정부지원금: 해당 기관 사업비의 50% 이내
-기업부담금: 해당 기관 사업비의 50% 이상
+기업부담금(현금): 기업부담금 소계의 15% 이상
 
 <span class="info-pop-section">중견기업</span>
 정부지원금: 해당 기관 사업비의 70% 이내
-기업부담금: 해당 기관 사업비의 30% 이상
+기업부담금(현금): 기업부담금 소계의 13% 이상
 
 <span class="info-pop-section">중소기업</span>
 정부지원금: 해당 기관 사업비의 75% 이내
-기업부담금: 해당 기관 사업비의 25% 이상
+기업부담금(현금): 기업부담금 소계의 10% 이상
 
 <span class="info-pop-section">공기업</span>
 기본적으로 대기업 기준 준용
@@ -343,7 +395,7 @@
       </section>
 
       <section class="card">
-        <h2>결과 영역</h2>
+        <h2 class="result-card-title">결과 영역</h2>
         <div class="result-layout">
           <div id="resultArea" class="result-main empty">참여인력을 입력한 뒤 출력 버튼을 눌러주세요.</div>
           <div class="result-side">
@@ -362,7 +414,252 @@
       public: { label: "공기업", govRatio: 0.5, cashRatio: 0.15 }
     };
 
-    const state = { people: [] };
+    const state = { people: [], lastDownloadPayload: null };
+
+    function setDownloadPayload(payload) {
+      state.lastDownloadPayload = payload;
+      const el = document.getElementById("downloadHwpBtn");
+      if (el) el.disabled = !payload;
+    }
+
+    /** 출력 버튼과 같은 줄 높이, 가로는 출력 버튼 너비의 50% */
+    function syncDownloadBtnWidth() {
+      const calcEl = document.getElementById("calculateBtn");
+      const dlEl = document.getElementById("downloadHwpBtn");
+      if (!calcEl || !dlEl) return;
+      const w = calcEl.getBoundingClientRect().width;
+      if (!w) return;
+      dlEl.style.width = `${Math.round(w / 2)}px`;
+    }
+
+    function syncDownloadBtnWidthDeferred() {
+      requestAnimationFrame(() => {
+        requestAnimationFrame(syncDownloadBtnWidth);
+      });
+    }
+
+    function formatDownloadStamp() {
+      const d = new Date();
+      const p = (n) => String(n).padStart(2, "0");
+      return `${d.getFullYear()}${p(d.getMonth() + 1)}${p(d.getDate())}_${p(d.getHours())}${p(d.getMinutes())}${p(d.getSeconds())}`;
+    }
+
+    function buildDetailExportTableRows(result) {
+      const detailed = result.detailed;
+      const existingRows = detailed.filter((p) => p.personType === "existing");
+      const newRows = detailed.filter((p) => p.personType === "new");
+      const header = [
+        "인력 구분",
+        "성명",
+        "직위",
+        "구분",
+        "총 연봉(천원)",
+        "참여개월수",
+        "참여개월 반영 연봉(천원)",
+        "참여율(%)",
+        "현금(천원)",
+        "현물(천원)",
+        "계(천원)"
+      ];
+      const row = (p) => [
+        p.personType === "existing" ? "기존 인력" : "신규 인력",
+        p.name,
+        p.title,
+        p.employmentType,
+        formatMoney(p.annualSalary),
+        formatMoney(p.months),
+        formatMoney(p.reflectedSalary),
+        formatRate(p.participationRate),
+        formatMoney(p.cash),
+        formatMoney(p.inKind),
+        formatMoney(p.total)
+      ];
+      return [
+        header,
+        ...existingRows.map(row),
+        [
+          "기존 인력 소계",
+          "",
+          "",
+          "",
+          "",
+          "",
+          "",
+          "",
+          formatMoney(sum(existingRows, "cash")),
+          formatMoney(sum(existingRows, "inKind")),
+          formatMoney(sum(existingRows, "total"))
+        ],
+        ...newRows.map(row),
+        [
+          "신규 인력 소계",
+          "",
+          "",
+          "",
+          "",
+          "",
+          "",
+          "",
+          formatMoney(sum(newRows, "cash")),
+          formatMoney(sum(newRows, "inKind")),
+          formatMoney(sum(newRows, "total"))
+        ],
+        [
+          "합계",
+          "",
+          "",
+          "",
+          "",
+          "",
+          "",
+          "",
+          formatMoney(sum(detailed, "cash")),
+          formatMoney(sum(detailed, "inKind")),
+          formatMoney(sum(detailed, "total"))
+        ]
+      ];
+    }
+
+    /** RTF 유니코드 이스케이프 (한글·숫자·부호) */
+    function rtfUnicode(s) {
+      let t = String(s ?? "");
+      let out = "";
+      for (let i = 0; i < t.length; i++) {
+        const c = t[i];
+        const code = t.charCodeAt(i);
+        if (code >= 0xd800 && code <= 0xdbff && i + 1 < t.length) {
+          const lo = t.charCodeAt(i + 1);
+          if (lo >= 0xdc00 && lo <= 0xdfff) {
+            const hi = code;
+            const sHi = hi > 32767 ? hi - 65536 : hi;
+            const sLo = lo > 32767 ? lo - 65536 : lo;
+            out += `\\u${sHi}?\\u${sLo}?`;
+            i++;
+            continue;
+          }
+        }
+        if (code < 128) {
+          if (c === "\\" || c === "{" || c === "}") out += "\\" + c;
+          else if (c === "\n" || c === "\r") {
+            if (c === "\r" && t[i + 1] === "\n") i++;
+            out += "\\line ";
+          } else out += c;
+        } else {
+          const signed = code > 32767 ? code - 65536 : code;
+          out += `\\u${signed}?`;
+        }
+      }
+      return out;
+    }
+
+    /**
+     * RTF 표: 행마다 \\trowd·\\cellx를 반복해야 한글·워드에서 표로 인식되는 경우가 많음.
+     * \\cellx 값은 왼쪽 여백 기준 누적 위치(twips).
+     */
+    function rtfTable(matrix, options = {}) {
+      if (!matrix.length) return "";
+      const cols = Math.max(...matrix.map((r) => r.length));
+      const headerRow = Boolean(options.headerRow);
+      const totalTwips = Number(options.totalTwips) > 0 ? options.totalTwips : 15000;
+      const tw = Math.floor(totalTwips / cols);
+      let rtf = "\\pard\\ql ";
+      for (let rIdx = 0; rIdx < matrix.length; rIdx++) {
+        const row = matrix[rIdx];
+        const boldHeader = headerRow && rIdx === 0;
+        rtf += "\\trowd\\trgaph108\\trleft0";
+        for (let c = 1; c <= cols; c++) {
+          rtf += `\\cellx${c * tw}`;
+        }
+        rtf += "\\intbl ";
+        for (let c = 0; c < cols; c++) {
+          if (c > 0) rtf += "\\cell ";
+          if (boldHeader) rtf += "\\b ";
+          rtf += rtfUnicode(String(row[c] ?? ""));
+          if (boldHeader) rtf += "\\b0 ";
+        }
+        rtf += "\\row ";
+      }
+      return `${rtf}\\pard\\ql `;
+    }
+
+    /** 브라우저에서 한글·워드가 안정적으로 여는 RTF 본문 생성 */
+    function buildResultRtfDocument(payload) {
+      const { result, mode } = payload;
+      const r = result;
+      const table1Rows = [
+        ["비목", "정부지원금(천원)", "기업부담금(현금)", "기업부담금(현물)", "기업부담금 소계", "합계"],
+        [
+          "인건비",
+          formatMoney(r.table1.govFund),
+          formatMoney(r.table1.privateCash),
+          formatMoney(r.table1.privateInKind),
+          formatMoney(r.table1.privateTotal),
+          formatMoney(r.table1.grand)
+        ]
+      ];
+
+      let inner = "";
+      inner += "{\\fonttbl{\\f0\\fnil\\fcharset129 Malgun Gothic;}}\\viewkind4\\uc1\\pard\\lang1042\n";
+      inner += "\\qc\\b\\fs36 ";
+      inner += rtfUnicode("인건비 계산 결과");
+      inner += "\\par\\pard\\ql\\b0\\fs24 ";
+      inner += rtfUnicode(`기업 유형: ${r.policy.label}`) + "\\par ";
+      inner += rtfUnicode(`정부지원금(입력): ${formatMoney(r.table1.govFund)} 천 원`) + "\\par ";
+      inner += rtfUnicode(`작성 시각: ${new Date().toLocaleString("ko-KR")}`) + "\\par ";
+      inner += "\\par ";
+
+      if (mode === "table1Only") {
+        inner += "\\b ";
+        inner +=
+          rtfUnicode(
+            "※ 아래는 표1(인건비 총괄)만 산출된 결과입니다. 참여인력 검증 오류로 표2는 생략되었습니다."
+          ) + "\\par ";
+        inner += "\\b0\\par ";
+      }
+
+      inner += "\\b ";
+      inner += rtfUnicode("인건비 총괄") + "\\par\\b0 ";
+      inner += rtfTable(table1Rows, { headerRow: true, totalTwips: 9000 });
+      inner += "\\par ";
+
+      if (mode === "full") {
+        inner += "\\b ";
+        inner += rtfUnicode("인건비 세부") + "\\par\\b0 ";
+        inner += rtfTable(buildDetailExportTableRows(result), { headerRow: true, totalTwips: 15500 });
+        inner += "\\par ";
+      }
+
+      inner += "\\i ";
+      inner +=
+        rtfUnicode("안내: 본 문서는 참고용 산정 결과이며, 과제별 공고·작성지침을 반드시 확인하세요.") + "\\par ";
+      inner += "\\i0 ";
+
+      return `{\\rtf1\\ansi\\ansicpg949\\deff0\n${inner}}`;
+    }
+
+    function downloadResultRtf() {
+      const payload = state.lastDownloadPayload;
+      if (!payload) {
+        alert("다운로드할 계산 결과가 없습니다. 먼저 출력을 실행해 주세요.");
+        return;
+      }
+      try {
+        const rtf = buildResultRtfDocument(payload);
+        const blob = new Blob([rtf], { type: "application/rtf" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = `인건비계산_${formatDownloadStamp()}.rtf`;
+        a.rel = "noopener";
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        URL.revokeObjectURL(url);
+      } catch (e) {
+        console.error(e);
+        alert("파일을 만드는 중 오류가 발생했습니다. 잠시 후 다시 시도해 주세요.");
+      }
+    }
     let personId = 1;
     let draggingPersonId = null;
 
@@ -710,9 +1007,11 @@
     }
 
     function buildTable1(govFund, policy) {
-      const totalProjectCost = floorKrwToThousand(govFund / policy.govRatio);
+      /** 총사업비 = 정부지원금 ÷ 정부지원 비율의 올림. floor만 쓰면 천 원 정수에서 govFund/총사업비 > 비율(예: 70%)이 될 수 있음. */
+      const totalProjectCost = -Math.floor(-(Number(govFund) / policy.govRatio));
       const privateTotal = totalProjectCost - govFund;
-      const privateCash = floorKrwToThousand(privateTotal * policy.cashRatio);
+      const rawCash = privateTotal * policy.cashRatio;
+      const privateCash = Math.min(privateTotal, Math.ceil(rawCash - 1e-9));
       const privateInKind = privateTotal - privateCash;
       return {
         govFund,
@@ -849,6 +1148,15 @@
       `;
     }
 
+    function getDownloadBarHtml() {
+      return `
+        <div class="download-hwp-wrap result-download-below">
+          <button type="button" id="downloadHwpBtn" class="download-hwp-btn" disabled title="계산 결과를 RTF 문서로 저장합니다.">출력물 다운로드</button>
+          <p class="download-hwp-hint">RTF(.rtf)로 저장됩니다. 한글·워드에서 바로 열 수 있습니다. (웹 브라우저 한계로 HWPX/HWP 바이너리는 호환되지 않습니다.)</p>
+        </div>
+      `;
+    }
+
     function renderResultPlaceholder(message) {
       resultAreaEl.className = "result-main";
       resultAreaEl.innerHTML = `<div class="empty">${message}</div>${getGuideNoteHtml()}`;
@@ -879,13 +1187,14 @@
 
     function renderTable1Only(result) {
       resultAreaEl.className = "result-main";
-      resultAreaEl.innerHTML = getTable1Html(result.table1) + getGuideNoteHtml();
+      resultAreaEl.innerHTML = getTable1Html(result.table1) + getDownloadBarHtml() + getGuideNoteHtml();
     }
 
     function renderTables(result) {
       const { detailed, table1 } = result;
       if (!detailed.length) {
         renderResultPlaceholder("참여인력 데이터가 없어 결과를 표시할 수 없습니다.");
+        setDownloadPayload(null);
         return;
       }
 
@@ -944,7 +1253,7 @@
       `;
 
       resultAreaEl.className = "result-main";
-      resultAreaEl.innerHTML = table1Html + table2Html + getGuideNoteHtml();
+      resultAreaEl.innerHTML = table1Html + table2Html + getDownloadBarHtml() + getGuideNoteHtml();
     }
 
     document.getElementById("addExisting").addEventListener("click", () => addPerson("existing"));
@@ -959,6 +1268,7 @@
       if (errors.length) {
         renderMessages({ errors, warnings: [], oks: [] });
         renderResultPlaceholder("입력값 오류를 먼저 수정해 주세요.");
+        setDownloadPayload(null);
         return;
       }
 
@@ -968,17 +1278,33 @@
       if (result.messages.errors.length) {
         if (result.table1Only) {
           renderTable1Only(result);
+          setDownloadPayload({ result, mode: "table1Only" });
+          syncDownloadBtnWidthDeferred();
           return;
         }
         renderResultPlaceholder("계산 조건을 충족하지 않아 결과 표를 생성할 수 없습니다.");
+        setDownloadPayload(null);
         return;
       }
       renderTables(result);
+      setDownloadPayload({ result, mode: "full" });
+      syncDownloadBtnWidthDeferred();
+    });
+
+    window.addEventListener("resize", () => {
+      syncDownloadBtnWidth();
+    });
+
+    resultAreaEl.addEventListener("click", (e) => {
+      if (e.target.closest("#downloadHwpBtn")) {
+        downloadResultRtf();
+      }
     });
 
     addPerson("existing");
     addPerson("new");
     renderResultPlaceholder("참여인력을 입력한 뒤 출력 버튼을 눌러주세요.");
+    setDownloadPayload(null);
   </script>
 </body>
 </html>
